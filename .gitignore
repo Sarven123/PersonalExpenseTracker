@@ -1,0 +1,94 @@
+# =========================================================================
+# PersonalExpenseTracker .gitignore
+# This is a personal finance app. When in doubt, ignore it rather than
+# risk committing real financial data. Synthetic fixtures under Fixtures/
+# are explicitly un-ignored below — do not remove that allowlist.
+# =========================================================================
+
+# --- Xcode / build products ---
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# --- User-specific Xcode settings and workspace metadata ---
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.perspectivev3
+timeline.xctimeline
+playground.xcworkspace
+
+# --- Swift Package Manager ---
+Core/.build/
+Core/.swiftpm/
+.build/
+.swiftpm/
+Package.resolved
+
+# --- SwiftData / Core Data local stores (must never be committed) ---
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.store
+*.momd/
+*.mom
+*.cdm
+
+# --- Local backups produced by the app's own backup-export feature ---
+*.backup
+*.bak
+Backups/
+LocalBackups/
+
+# --- Real bank exports / account statements (never commit real financial data) ---
+# Synthetic fixtures live only in /Fixtures/ and are explicitly re-included below.
+*.ofx
+*.qif
+*.mt940
+Kontoauszug*
+kontoauszug*
+Umsatzanzeige*
+umsatzanzeige*
+statement*.csv
+statement*.pdf
+*.pdf
+/Imports/
+/UserData/
+
+# --- Secrets, credentials, private configuration ---
+.env
+.env.*
+*.env
+secrets.json
+credentials.json
+credentials.plist
+*.pem
+*.p12
+*.p8
+*.cer
+*.crt
+*.key
+*.keychain
+*.keychain-db
+*.mobileprovision
+*.provisionprofile
+*ApiKey*
+*api_key*
+GoogleService-Info.plist
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Re-allow synthetic, fictional test fixtures (must contain no real data) ---
+!/Fixtures/
+!/Fixtures/**

@@ -1,0 +1,7 @@
+"Buchungsdatum";"Wertstellung";"Umsatzart";"Buchungstext";"Empfänger/Zahlungspflichtiger";"IBAN";"BIC";"Betrag";"Waehrung"
+01.09.2026;01.09.2026;"Lastschrift";"Stromabschlag August";"Stadtwerke Musterstadt";"DE40500105170234567890";"NOLADE21";"-89,50";"EUR"
+04.09.2026;04.09.2026;"Kartenzahlung";"Apotheke am Markt";"Apotheke am Markt e.K.";"DE41500105170345678901";"NOLADE21";"-15,30";"EUR"
+06.09.2026;06.09.2026;"Gutschrift";"Erstattung Krankenkasse";"AOK Musterland";"DE42500105170456789012";"NOLADE21";"1.234,56";"EUR"
+09.09.2026;09.09.2026;"Lastschrift";"Fitnessstudio Beitrag; Vertrag 445566";"FitFirst Studios GmbH";"DE43500105170567890123";"NOLADE21";"-29,90";"EUR"
+11.09.2026;11.09.2026;"Kartenzahlung";"Restaurant Zur Alten Post";"Restaurant Zur Alten Post";"DE44500105170678901234";"NOLADE21";"-67,20";"EUR"
+14.09.2026;14.09.2026;"Ueberweisung";"Geburtstagsgeschenk Überweisung";"Privatperson";"DE45500105170789012345";"NOLADE21";"-50,00";"EUR"
