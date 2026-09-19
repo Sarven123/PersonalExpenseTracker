@@ -23,65 +23,80 @@ Being built in 8 phases, one phase per work session (the original phase plan is 
 ```
 PersonalExpenseTracker/
 ├── App/macOS/                    macOS-only: app entry point, window/menu chrome, sidebar shell, Resources
-│   ├── PersonalExpenseTrackerApp.swift   @main, injects ModelContainer, attaches AppCommands
+│   ├── PersonalExpenseTrackerApp.swift   @main, injects ModelContainer, seeds default categories, forces de_DE locale
 │   ├── ContentView.swift                 NavigationSplitView root (Dashboard/Transactions/Insights/Settings)
 │   ├── Sidebar/SidebarView.swift
-│   ├── Commands/AppCommands.swift        Cmd+N placeholder; more shortcuts added later
+│   ├── Commands/AppCommands.swift        Cmd+N posts .petRequestAddExpense; more shortcuts added later
 │   └── Resources/ (Assets.xcassets, Info.plist, PersonalExpenseTracker.entitlements)
-├── PersonalExpenseTrackerTests/  Thin XCTest/Swift-Testing bundle for app-level/SwiftData integration checks
+├── PersonalExpenseTrackerTests/  Thin Swift-Testing bundle for app-level/SwiftData integration checks
 ├── Fixtures/                     Fictional Sparkasse CSV samples (UTF-8 CAMT, Windows-1252 CAMT, MT940-style)
 ├── Core/                         Local SwiftPM package "PETCore" — all platform-agnostic logic lives here
 │   ├── Package.swift              swift-tools-version 6.0; platforms .macOS(.v14) + .iOS(.v17) declared now
-│   ├── Sources/PETModels/         SwiftData models + ModelContainerFactory (only target implemented so far)
-│   └── Tests/PETModelsTests/      Swift Testing tests for the models
+│   ├── Sources/
+│   │   ├── PETModels/             SwiftData models + ModelContainerFactory
+│   │   ├── PETCategorization/     DefaultCategorySeed (14 categories); rule engine arrives Phase 5
+│   │   ├── PETRepositories/       CategoryRepository, TransactionRepository (CRUD, all business rules)
+│   │   └── PETSharedUI/           SwiftUI views: TransactionListView, TransactionEditView,
+│   │                              CategoryManagerView, CategoryBadge, ColorHex, Notifications
+│   └── Tests/
+│       ├── PETModelsTests/, PETCategorizationTests/, PETRepositoriesTests/   Swift Testing
 └── PersonalExpenseTracker.xcodeproj/   Hand-authored project.pbxproj + shared scheme + workspace data
 ```
 
-**Planned future package targets** (not yet created — add to `Core/Package.swift` when their phase starts): `PETImport` (CSV/encoding/date/number parsing), `PETCategorization` (rule engine, merchant normalization, recurring detection), `PETRepositories` (CRUD + analytics aggregation), `PETExport` (CSV/backup export), `PETSharedUI` (all SwiftUI feature views, platform-agnostic).
+**Planned future package targets** (not yet created — add to `Core/Package.swift` when their phase starts): `PETImport` (CSV/encoding/date/number parsing, Phase 3), `PETExport` (CSV/backup export, Phase 7). `PETCategorization` will gain `CategoryRuleEngine`/`MerchantNormalizer`/`RecurringDetector` in Phase 5.
 
 **SwiftData schema (implemented in `Core/Sources/PETModels`):**
 - `ExpenseCategory` — id, name, colorHex, symbolName, sortOrder, isTransferCategory, isSystemDefault, createdAt; relationships to `transactions` and `merchantRules`. **Named `ExpenseCategory`, not `Category`** — see Important Decisions.
-- `Transaction` — id, bookingDate, valueDate?, amount (Decimal, signed), currencyCode, type (.expense/.income/.transfer), merchant, rawDescription (original bank text preserved), purpose?, bookingText?, iban?, counterpartyIBAN?, notes?, isRecurring, source (.manual/.imported), isExcludedFromAnalytics, dedupeHash, categorySuggestionSource?, createdAt, modifiedAt; relationships to `category`, `importBatch`, `recurringSchedule`.
+- `ExpenseTransaction` — id, bookingDate, valueDate?, amount (Decimal, signed), currencyCode, type (.expense/.income/.transfer), merchant, rawDescription (original bank text preserved), purpose?, bookingText?, iban?, counterpartyIBAN?, notes?, isRecurring, source (.manual/.imported), isExcludedFromAnalytics, dedupeHash, categorySuggestionSource?, createdAt, modifiedAt; relationships to `category`, `importBatch`, `recurringSchedule`. **Named `ExpenseTransaction`, not `Transaction`** — see Important Decisions.
 - `RecurringSchedule` — id, frequency, interval, startDate, endDate?, dayOfMonth?, nextExpectedDate?, isActive; relationship to `transaction`.
 - `MerchantRule` — id, matchType, pattern, priority, origin (.builtIn/.userCorrection), isRecurringHint, matchCount, createdAt; relationship to `category`.
 - `ImportBatch` — id, importedAt, sourceFileName, sourceFormat, detectedEncoding, columnMapping (Data/JSON), rowCount, importedCount, skippedDuplicateCount, notes?; relationship to `transactions`.
 - Delete rules: Category→Transaction `.nullify`, ImportBatch→Transaction `.nullify`, MerchantRule→Category `.nullify` (never cascade-delete spending data).
-- `ModelContainerFactory` provides `makeLiveContainer()`, `makeInMemoryContainer()`, `previewContainer`.
+- `ModelContainerFactory` provides `makeLiveContainer()`, `makeInMemoryContainer()` (each call gets a uniquely-named in-memory configuration — see Important Decisions), `previewContainer`.
 
-**Import pipeline / categorization logic / reusable components:** not yet implemented (Phases 3–5).
+**Categorization (Phase 2 slice, in `Core/Sources/PETCategorization`):** `DefaultCategorySeed.all` — the 14 default categories (Food, Transport, Entertainment, Subscriptions, Housing, Utilities, Health, Shopping, Travel, Education, Fees, Income, Transfers, Other) with color/symbol/sortOrder; `Transfers` is the one `isTransferCategory` entry. Seeded automatically on app launch via `CategoryRepository.seedDefaultCategoriesIfNeeded()` (idempotent — safe to call every launch). Rule-based auto-suggestion, merchant normalization, and recurring detection are **not yet implemented** (Phase 5).
 
-**Xcode project mechanics:** `project.pbxproj` was hand-authored (no Xcode GUI, no xcodegen) using deterministic sha1-derived object IDs (see generator script used during Phase 1, not checked into the repo — recreate similarly if the pbxproj ever needs regenerating by script rather than by Edit). The app target links the local package product `PETModels` via `XCLocalSwiftPackageReference`/`XCSwiftPackageProductDependency`. A shared scheme (`xcshareddata/xcschemes/PersonalExpenseTracker.xcscheme`) was added manually so `xcodebuild -scheme PersonalExpenseTracker` works without ever opening Xcode's GUI. Code signing uses `CODE_SIGN_IDENTITY = "-"` (ad hoc / "Sign to Run Locally") — no Apple Developer team required for local builds.
+**Repositories (`Core/Sources/PETRepositories`, both `@MainActor`):**
+- `CategoryRepository` — `fetchAll()`, `seedDefaultCategoriesIfNeeded()`, `create/rename/recolor/setSymbol`, `delete(_:reassigningTransactionsTo:)` (rejects deleting a system-default category via `CategoryRepositoryError.cannotDeleteSystemDefault`; rejects duplicate names case-insensitively via `.duplicateName`).
+- `TransactionRepository` — `fetchAll(sortedByDateDescending:)`, `createManualTransaction(...)`, `update(...)`, `delete(...)`. Callers pass a positive `magnitude`; the repository derives the signed `amount` from `TransactionType` (expense/transfer → negative, income → positive) — see Important Decisions.
+
+**Shared UI (`Core/Sources/PETSharedUI`, pure SwiftUI, no AppKit):** `TransactionListView` (list + empty state + toolbar "Add Expense"/"Manage Categories"), `TransactionEditView` (Add/Edit sheet, `.create`/`.edit(ExpenseTransaction)` modes), `CategoryManagerView` (create/rename/recolor/delete-with-reassignment), `CategoryBadge`, `Color(hex:)`/`.toHex()` helpers, and `.petRequestAddExpense` notification (lets macOS menu commands trigger the Add Expense sheet from wherever `TransactionListView` is showing). These views are platform-agnostic by construction so an iOS target can reuse them.
+
+**Import pipeline / recurring detection / analytics:** not yet implemented (Phases 3, 5, 6).
+
+**Xcode project mechanics:** `project.pbxproj` was hand-authored (no Xcode GUI, no xcodegen) using deterministic sha1-derived object IDs (`gid(name) = sha1(name)[:24].uppercased()`, so the same logical name always yields the same ID — new entries are added by computing `gid()` for the new name and inserting via targeted `Edit` calls, not by regenerating the whole file). The app target links local package products (`PETModels`, `PETRepositories`, `PETSharedUI`) via `XCLocalSwiftPackageReference`/`XCSwiftPackageProductDependency`; the test target currently only links `PETModels`. A shared scheme (`xcshareddata/xcschemes/PersonalExpenseTracker.xcscheme`) was added manually so `xcodebuild -scheme PersonalExpenseTracker` works without ever opening Xcode's GUI. Code signing uses `CODE_SIGN_IDENTITY = "-"` (ad hoc / "Sign to Run Locally") — no Apple Developer team required for local builds.
 
 ## Completed
 - [x] Directory scaffold created at `./PersonalExpenseTracker` (App/macOS, Core, Fixtures, Tests, .xcodeproj).
-- [x] Local SwiftPM package `Core/` with product `PETModels`; builds standalone via `swift build`.
-- [x] Full SwiftData schema (ExpenseCategory, Transaction, MerchantRule, ImportBatch, RecurringSchedule) + `ModelContainerFactory`.
+- [x] Local SwiftPM package `Core/` with products `PETModels`, `PETCategorization`, `PETRepositories`, `PETSharedUI`; builds standalone via `swift build`.
+- [x] Full SwiftData schema (ExpenseCategory, ExpenseTransaction, MerchantRule, ImportBatch, RecurringSchedule) + `ModelContainerFactory`.
 - [x] Hand-authored `.xcodeproj` (project.pbxproj, shared scheme, workspace data) with app target + test target, both wired to the local package.
-- [x] SwiftUI navigation shell: `NavigationSplitView` sidebar with Dashboard/Transactions/Insights/Settings placeholders.
+- [x] SwiftUI navigation shell: `NavigationSplitView` sidebar with Dashboard/Transactions/Insights/Settings; Transactions is the default/live tab, the other three remain placeholders.
 - [x] App Sandbox entitlements (no network entitlement; read-only user-selected-file access) wired into the app target.
 - [x] Asset catalog (AppIcon slots unpopulated, AccentColor set), Info.plist, entitlements file.
 - [x] Three fictional Sparkasse CSV fixtures (UTF-8 CAMT, Windows-1252 CAMT, MT940-style) with umlauts and an embedded-semicolon quoted field.
-- [x] `.gitignore` for Xcode/SwiftPM/macOS artifacts.
-- [x] Verified: `swift build` and `swift test` pass inside `Core/` (2 tests).
+- [x] `.gitignore` for Xcode/SwiftPM/macOS artifacts; Git/GitHub backup workflow set up (see Version Control & Backup).
+- [x] **Phase 2 — Categories + manual transaction CRUD:** `DefaultCategorySeed` (14 categories, auto-seeded on launch), `CategoryRepository` and `TransactionRepository` with full CRUD + validation, Add/Edit Transaction sheet (`TransactionEditView`), transaction list with empty state (`TransactionListView`), Category Manager (create/rename/recolor/delete-with-reassignment, system-default categories protected from deletion). German locale (`de_DE`) forced app-wide via `.environment(\.locale:)` so dates/amounts follow German conventions regardless of system locale.
+- [x] Verified: `swift build` and `swift test` pass inside `Core/` (12 tests across PETModelsTests, PETCategorizationTests, PETRepositoriesTests).
 - [x] Verified: `xcodebuild build` and `xcodebuild test` succeed for the app scheme (1 integration test).
-- [x] Verified: built `.app` launches and stays running without crashing (manually opened and quit during Phase 1).
+- [x] Verified: built `.app` launches, stays running without crashing, and correctly seeds categories once (idempotent across relaunches) — checked by running the binary directly and inspecting stdout/stderr for errors.
 
 ## In Progress
-Nothing is currently mid-implementation. Phase 1 (scaffold) is closed out. Phase 2 (categories + manual transaction CRUD) has not been started yet.
+Nothing is currently mid-implementation. Phase 2 is closed out. Phase 3 (CSV import parsing engine) has not been started yet.
 
 ## Remaining Work
-Prioritized by the 8-phase roadmap (see plan file referenced above):
-1. **Phase 2 — Categories + manual transaction CRUD:** `DefaultCategorySeed` (14 categories), `CategoryRepository`, `TransactionRepository`, Add/Edit Transaction sheet, basic transaction list, Category Manager (create/rename/recolor/delete-with-reassignment).
-2. **Phase 3 — CSV import parsing engine (no UI):** encoding detector, German number/date parsers, quote-aware semicolon CSV parser, CAMT/MT940 header-alias layouts, `ColumnMapping`, row mapper, duplicate detector, actionable `ImportError`; tests against the Phase 1 fixtures.
-3. **Phase 4 — Import UI:** file picker, column-mapping step, preview + parse warnings, duplicate-review step, commit → `ImportBatch` + `Transaction`s.
-4. **Phase 5 — Categorization engine:** `CategoryRuleEngine`, `MerchantNormalizer`, builtin rules, manual-correction-creates-rule, `RecurringDetector`, MerchantRule manager UI, Uncategorized filter.
-5. **Phase 6 — Dashboard + Swift Charts:** `AnalyticsRepository` aggregations, donut/bar + time-series charts with hover, weekly summary, recent transactions, top merchants, recurring summary, empty state with opt-in demo data.
-6. **Phase 7 — Filters, insights, search/sort/export, Settings:** shared `FilterCriteria`, searchable/sortable table, CSV export, Insights view, backup export, Delete All Local Data with confirmation.
-7. **Phase 8 — Polish, README, final verification:** keyboard shortcuts, accessibility, light/dark QA, full README, clean `xcodebuild build`/`test` + `swift test` pass with all warnings fixed.
+Prioritized by the 8-phase roadmap:
+1. **Phase 3 — CSV import parsing engine (no UI):** encoding detector, German number/date parsers, quote-aware semicolon CSV parser, CAMT/MT940 header-alias layouts, `ColumnMapping`, row mapper, duplicate detector, actionable `ImportError`; tests against the Phase 1 fixtures. New `PETImport` package target.
+2. **Phase 4 — Import UI:** file picker, column-mapping step, preview + parse warnings, duplicate-review step, commit → `ImportBatch` + `ExpenseTransaction`s.
+3. **Phase 5 — Categorization engine:** `CategoryRuleEngine`, `MerchantNormalizer`, builtin rules, manual-correction-creates-rule, `RecurringDetector`, MerchantRule manager UI, Uncategorized filter (expands the existing `PETCategorization` target).
+4. **Phase 6 — Dashboard + Swift Charts:** `AnalyticsRepository` aggregations, donut/bar + time-series charts with hover, weekly summary, recent transactions, top merchants, recurring summary, empty state with opt-in demo data. Switch `ContentView`'s default tab back to Dashboard once it's real.
+5. **Phase 7 — Filters, insights, search/sort/export, Settings:** shared `FilterCriteria`, searchable/sortable table (upgrade `TransactionListView`'s plain `List` to a `Table`), CSV export, Insights view, backup export, Delete All Local Data with confirmation. New `PETExport` package target.
+6. **Phase 8 — Polish, README, final verification:** keyboard shortcuts, accessibility, light/dark QA, full README, clean `xcodebuild build`/`test` + `swift test` pass with all warnings fixed.
 
 ## Known Issues
 - App icon (`AppIcon.appiconset`) has size slots declared but no actual images assigned — cosmetic only, does not block builds; expected to be addressed in Phase 8 polish.
-- `Core/Package.swift` currently declares only the `PETModels` target/product. Adding `PETImport`, `PETCategorization`, `PETRepositories`, `PETExport`, `PETSharedUI` targets requires manually editing `Package.swift` at the start of their respective phases (SwiftPM auto-discovers new files within an *existing* target's `Sources/` folder, but a brand-new target must be declared manually).
+- `Core/Package.swift` needs a manual edit each time a brand-new target is introduced (`PETImport` in Phase 3, `PETExport` in Phase 7) — SwiftPM only auto-discovers new files within an *already-declared* target's `Sources/` folder.
+- `ContentView` defaults to the Transactions tab instead of Dashboard, since Dashboard is still a placeholder. Revert the default once Phase 6 ships.
 - No known compile errors, test failures, or crashes as of the last verification below.
 
 ## Build and Test Status
@@ -89,8 +104,8 @@ Prioritized by the 8-phase roadmap (see plan file referenced above):
 - Last build result: **BUILD SUCCEEDED**
 - Last test command: `xcodebuild test -project PersonalExpenseTracker.xcodeproj -scheme PersonalExpenseTracker -destination 'platform=macOS'`
 - Last test result: **TEST SUCCEEDED** (1 test in PersonalExpenseTrackerTests)
-- Also verified independently: `swift build` and `swift test` inside `Core/` — both succeeded (2 tests in PETModelsTests).
-- Date/time of last verification: 2026-09-20 (Phase 1 session).
+- Also verified independently: `swift build` and `swift test` inside `Core/` — both succeeded (12 tests: 2 PETModelsTests, 1 PETCategorizationTests, 9 PETRepositoriesTests).
+- Date/time of last verification: 2026-09-20 (Phase 2 session).
 - Warnings that still matter: none observed in the build logs at time of verification. Re-check after each phase since new source files may introduce new warnings.
 
 ## Version Control & Backup
@@ -111,6 +126,14 @@ Prioritized by the 8-phase roadmap (see plan file referenced above):
 - **App Sandbox is on with only `com.apple.security.files.user-selected.read-only`; no network entitlement is present at all.** Reason: architecturally enforces the "no network calls" requirement rather than relying on code discipline alone.
 - **Swift Testing framework (`import Testing`, `@Suite`/`@Test`) used instead of XCTest** for both the package tests and the app-level test target. Reason: it's the modern, Xcode-16+-native testing framework and works identically in `swift test` and `xcodebuild test`; XCTest remains available if a future phase needs UI-hosted tests that specifically require it.
 - **Fixture CSVs use entirely fictional data** (no real bank accounts, IBANs, or transactions) per the privacy/safety requirement, and were generated by hand plus `iconv` for the Windows-1252 variant.
+- **Renamed `Transaction` → `ExpenseTransaction`.** Reason: same class of bug as the `Category` rename — `Transaction` collides with `SwiftUI.Transaction` (the animation-transaction type) the moment a file imports both `SwiftUI` and the model module, producing an "ambiguous for type lookup" error. Hit this while building `PETSharedUI` in Phase 2. Given two collisions in two phases, treat any new model/type name as a candidate for an SDK collision before committing to it — grep Apple's frameworks mentally (or just pick a slightly more specific name up front) for common nouns like `Transaction`, `Category`, `Event`, `State`, `Task`, `Notification`.
+- **`ModelContainerFactory.makeInMemoryContainer()` gives every call a uniquely-named `ModelConfiguration`** (`"in-memory-\(UUID().uuidString)"`) instead of the default unnamed configuration. Reason: defensive hardening against store-identity collisions across concurrently-created in-memory containers (relevant for parallel test execution); done while diagnosing the dangling-context test crash below, and kept even though it wasn't the actual root cause.
+- **Test helpers must return the `ModelContainer`, never just `container.mainContext`.** Reason: a real bug was hit and fixed in Phase 2 — a `private func makeContext() -> ModelContext { ModelContainerFactory.makeInMemoryContainer().mainContext }` helper let the temporary `ModelContainer` get deallocated the instant the function returned (nothing retained it), leaving the returned `ModelContext` pointing at a torn-down in-memory store. This crashed with `SIGTRAP`/`EXC_BREAKPOINT` inside SwiftData on the *next* `insert`/`fetch`/`save`, non-deterministically depending on which test ran it — it was misdiagnosed at first as a Swift-Testing parallelism issue (which is why `.serialized` traits and unique container names were tried first) before the real cause was isolated by bisecting with scratch tests. Every test helper in this repo now returns `ModelContainer` and calls `.mainContext` at the point of use, keeping the container alive for the test's duration.
+- **Manual transaction entry takes a positive `magnitude` and derives the signed `amount` from `TransactionType`** (expense/transfer → negative, income → positive) inside `TransactionRepository`, rather than asking the user to type a signed number. Reason: matches how people actually think about entering an expense ("I spent €40"), and keeps the sign convention centralized in one place instead of duplicated across every UI entry point.
+- **German locale (`Locale(identifier: "de_DE")`) is forced app-wide via `.environment(\.locale:)`** on the root `ContentView`, rather than relying on `.locale()` modifiers on individual format styles. Reason: the product requirement is "German date/number conventions by default" regardless of the Mac's actual system locale; setting it once at the root is DRY and SwiftUI's format-style-based `Text`/`TextField` views pick up the environment locale automatically.
+- **Default categories are seeded automatically on every app launch** (idempotent — `seedDefaultCategoriesIfNeeded()` no-ops if any category already exists), and this is treated as baseline setup, not as the "demo data" the product spec says must never be auto-inserted. Reason: the spec's demo-data restriction is about sample *transactions*, not the core category taxonomy the whole app depends on.
+- **System-default categories (`isSystemDefault == true`) cannot be deleted**, only renamed/recolored; `CategoryRepository.delete` throws `.cannotDeleteSystemDefault` for them. Reason: protects the taxonomy that categorization rules (Phase 5) and analytics (Phase 6) will assume exists; custom categories can still be freely deleted with transaction reassignment.
+- **`TransactionListView` uses a plain SwiftUI `List`, not `Table`, for now.** Reason: Phase 2 only needs a basic editable list; the spec's "searchable, sortable transaction table" requirement is explicitly a Phase 7 deliverable, so upgrading to `Table` now would be premature scope.
 
 ## Session Handoff
 
@@ -124,3 +147,14 @@ Prioritized by the 8-phase roadmap (see plan file referenced above):
 **Command needed to continue:** From `PersonalExpenseTracker/`: `xcodebuild build -project PersonalExpenseTracker.xcodeproj -scheme PersonalExpenseTracker -destination 'platform=macOS'` (build) and `xcodebuild test -project PersonalExpenseTracker.xcodeproj -scheme PersonalExpenseTracker -destination 'platform=macOS'` (test); `cd Core && swift build && swift test` for package-only iteration. To sync with GitHub: `git status`, `git add -A`, `git commit -m "..."`, `git push`.
 
 **Any user decision still required:** None for now. The repository will remain private through all remaining phases; a future request to publish it publicly requires a fresh security review plus your explicit written confirmation (see `SECURITY.md`) — do not ask for that confirmation prematurely, only when the app reaches a genuinely stable, reviewed milestone.
+
+### Session 3 (Phase 2 — categories + manual transaction CRUD)
+**What was done in this session:** Implemented Phase 2 in full. Added three new `Core` package targets (`PETCategorization` with `DefaultCategorySeed`; `PETRepositories` with `CategoryRepository`/`TransactionRepository`; `PETSharedUI` with `TransactionListView`/`TransactionEditView`/`CategoryManagerView`/`CategoryBadge`/`ColorHex`/`Notifications`), wired the app to seed default categories on launch and force the `de_DE` locale app-wide, wired `ContentView`'s Transactions tab and `AppCommands`'s Cmd+N to the new UI, and hand-edited `project.pbxproj` to add `PETRepositories`/`PETSharedUI` as app-target package product dependencies. Hit and fixed two real bugs along the way: (1) `Transaction` collided with `SwiftUI.Transaction`, requiring the same rename treatment as `Category` did in Phase 1 — renamed to `ExpenseTransaction` throughout; (2) a `SIGTRAP` crash in the new `PETRepositoriesTests` traced (via crash-report parsing and bisection with scratch tests) to a test helper returning `container.mainContext` without keeping `container` alive, letting the in-memory store be deallocated out from under the context — fixed by having test helpers return `ModelContainer` instead. Both are recorded in Important Decisions so they aren't rediscovered. Verified `swift test` (12 tests, all passing), `xcodebuild build`/`test` (both succeeding), and did a manual smoke test by running the built binary directly and confirming clean stdout/stderr across two consecutive launches (categories seed once, no duplicate-seed errors on relaunch).
+
+**What remains:** Phases 3–8 of the product roadmap (see Remaining Work above), starting with Phase 3 (CSV import parsing engine).
+
+**Exact next step:** Start Phase 3 — add a new `PETImport` package target to `Core/Package.swift` (depends on `PETModels`) containing: an encoding detector (UTF-8/BOM/Windows-1252 fallback), German number/date parsers, a quote-aware semicolon-delimited CSV parser, CAMT/MT940 header-alias column layouts, `ColumnMapping`, a row mapper producing `DraftTransaction` values, a hash-based duplicate detector, and an actionable `ImportError` type. No UI yet (that's Phase 4). Write `PETImportTests` against the three fixtures in `Fixtures/` (UTF-8 CAMT, Windows-1252 CAMT, MT940-style), covering: German decimal-comma/thousands parsing edge cases, DD.MM.YYYY date parsing, encoding auto-detection, quoted-field/embedded-semicolon CSV quirks (the MT940 fixture already has one deliberately), and duplicate detection. Verify with `swift test`, then a full `xcodebuild build`/`test` pass. After that milestone, follow the Ongoing Backup Workflow in `SECURITY.md` (update `CLAUDE.md`, run tests, review diff for sensitive data, commit, push).
+
+**Command needed to continue:** From `PersonalExpenseTracker/`: `cd Core && swift build && swift test` for fast package-only iteration; `xcodebuild build -project PersonalExpenseTracker.xcodeproj -scheme PersonalExpenseTracker -destination 'platform=macOS'` and the equivalent `xcodebuild test …` for the full app once UI/pbxproj changes are involved. To sync with GitHub: `git status`, `git add -A`, `git commit -m "..."`, `git push`.
+
+**Any user decision still required:** None. Proceed with Phase 3 as planned unless redirected.

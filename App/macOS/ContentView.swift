@@ -1,4 +1,5 @@
 import SwiftUI
+import PETSharedUI
 
 enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case dashboard = "Dashboard"
@@ -19,15 +20,27 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct ContentView: View {
-    @State private var selection: SidebarSection? = .dashboard
+    // Defaults to Transactions until the Dashboard is built in Phase 6 — that's
+    // the only section with real functionality right now.
+    @State private var selection: SidebarSection? = .transactions
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } detail: {
             NavigationStack {
-                PlaceholderView(section: selection ?? .dashboard)
+                destination(for: selection ?? .transactions)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for section: SidebarSection) -> some View {
+        switch section {
+        case .transactions:
+            TransactionListView()
+        case .dashboard, .insights, .settings:
+            PlaceholderView(section: section)
         }
     }
 }

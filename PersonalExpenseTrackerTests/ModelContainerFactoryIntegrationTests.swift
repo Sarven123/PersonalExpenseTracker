@@ -12,7 +12,7 @@ struct ModelContainerFactoryIntegrationTests {
         let context = container.mainContext
 
         let category = ExpenseCategory(name: "Utilities", colorHex: "#95E1D3", symbolName: "bolt.fill")
-        let transaction = Transaction(
+        let transaction = ExpenseTransaction(
             bookingDate: .now,
             amount: Decimal(-19.99),
             type: .expense,
@@ -25,7 +25,7 @@ struct ModelContainerFactoryIntegrationTests {
         context.insert(transaction)
         try context.save()
 
-        let fetched = try context.fetch(FetchDescriptor<Transaction>())
+        let fetched = try context.fetch(FetchDescriptor<ExpenseTransaction>())
         #expect(fetched.count == 1)
         #expect(fetched.first?.category?.name == "Utilities")
     }

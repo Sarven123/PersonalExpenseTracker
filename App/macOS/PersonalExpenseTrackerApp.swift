@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PETModels
+import PETRepositories
 
 @main
 struct PersonalExpenseTrackerApp: App {
@@ -9,10 +10,25 @@ struct PersonalExpenseTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.locale, Locale(identifier: "de_DE"))
+                .task {
+                    seedDefaultCategoriesIfNeeded()
+                }
         }
         .modelContainer(modelContainer)
         .commands {
             AppCommands()
+        }
+    }
+
+    @MainActor
+    private func seedDefaultCategoriesIfNeeded() {
+        do {
+            try CategoryRepository(context: modelContainer.mainContext).seedDefaultCategoriesIfNeeded()
+        } catch {
+            #if DEBUG
+            print("Failed to seed default categories: \(error)")
+            #endif
         }
     }
 }

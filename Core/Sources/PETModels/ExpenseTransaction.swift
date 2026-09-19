@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-public final class Transaction {
+public final class ExpenseTransaction {
     @Attribute(.unique) public var id: UUID
     public var bookingDate: Date
     public var valueDate: Date?

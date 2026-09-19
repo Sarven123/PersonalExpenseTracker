@@ -15,6 +15,8 @@
 		79935316C8F7B374427716FD /* ModelContainerFactoryIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1018A3281CF9AB37958CB1E2 /* ModelContainerFactoryIntegrationTests.swift */; };
 		56F94473F8C98E689B8623C1 /* PETModels in Frameworks */ = {isa = PBXBuildFile; productRef = E6D6EDC9A52A738710808DD1 /* PETModels */; };
 		9119CFFC985892FEB625B5E4 /* PETModels in Frameworks */ = {isa = PBXBuildFile; productRef = 0D30CB695CA1CA34E3FE869D /* PETModels */; };
+		0417DC877F4DEFBBEF7007A4 /* PETRepositories in Frameworks */ = {isa = PBXBuildFile; productRef = 88E79C0997DAEC6528F731A2 /* PETRepositories */; };
+		ACCC7CDF42F19ABCF75DE41A /* PETSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = B9C744032730397B081F207F /* PETSharedUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +40,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				56F94473F8C98E689B8623C1 /* PETModels in Frameworks */,
+				0417DC877F4DEFBBEF7007A4 /* PETRepositories in Frameworks */,
+				ACCC7CDF42F19ABCF75DE41A /* PETSharedUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -144,6 +148,8 @@
 			name = PersonalExpenseTracker;
 			packageProductDependencies = (
 				E6D6EDC9A52A738710808DD1 /* PETModels */,
+				88E79C0997DAEC6528F731A2 /* PETRepositories */,
+				B9C744032730397B081F207F /* PETSharedUI */,
 			);
 			productName = PersonalExpenseTracker;
 			productReference = B673B05719250C4FB1DCF56A /* PersonalExpenseTracker.app */;
@@ -437,6 +443,14 @@
 		0D30CB695CA1CA34E3FE869D /* PETModels */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PETModels;
+		};
+		88E79C0997DAEC6528F731A2 /* PETRepositories */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PETRepositories;
+		};
+		B9C744032730397B081F207F /* PETSharedUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PETSharedUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

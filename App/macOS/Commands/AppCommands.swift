@@ -1,10 +1,11 @@
 import SwiftUI
+import PETSharedUI
 
 struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Expense…") {
-                // Wired up to the Add Expense flow in an upcoming phase.
+                NotificationCenter.default.post(name: .petRequestAddExpense, object: nil)
             }
             .keyboardShortcut("n", modifiers: .command)
         }

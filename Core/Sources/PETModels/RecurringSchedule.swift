@@ -12,8 +12,8 @@ public final class RecurringSchedule {
     public var nextExpectedDate: Date?
     public var isActive: Bool
 
-    @Relationship(deleteRule: .nullify, inverse: \Transaction.recurringSchedule)
-    public var transaction: Transaction?
+    @Relationship(deleteRule: .nullify, inverse: \ExpenseTransaction.recurringSchedule)
+    public var transaction: ExpenseTransaction?
 
     public init(
         id: UUID = UUID(),

@@ -12,8 +12,8 @@ public final class ExpenseCategory {
     public var isSystemDefault: Bool
     public var createdAt: Date
 
-    @Relationship(deleteRule: .nullify, inverse: \Transaction.category)
-    public var transactions: [Transaction]? = []
+    @Relationship(deleteRule: .nullify, inverse: \ExpenseTransaction.category)
+    public var transactions: [ExpenseTransaction]? = []
 
     @Relationship(deleteRule: .nullify, inverse: \MerchantRule.category)
     public var merchantRules: [MerchantRule]? = []

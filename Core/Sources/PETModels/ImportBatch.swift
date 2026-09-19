@@ -14,8 +14,8 @@ public final class ImportBatch {
     public var skippedDuplicateCount: Int
     public var notes: String?
 
-    @Relationship(deleteRule: .nullify, inverse: \Transaction.importBatch)
-    public var transactions: [Transaction]? = []
+    @Relationship(deleteRule: .nullify, inverse: \ExpenseTransaction.importBatch)
+    public var transactions: [ExpenseTransaction]? = []
 
     public init(
         id: UUID = UUID(),
