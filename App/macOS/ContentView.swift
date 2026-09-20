@@ -6,6 +6,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case transactions = "Transactions"
     case insights = "Insights"
     case settings = "Settings"
+    case netWorth = "Net Worth"
 
     var id: String { rawValue }
 
@@ -15,6 +16,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .transactions: "list.bullet.rectangle"
         case .insights: "chart.bar.xaxis"
         case .settings: "gearshape"
+        case .netWorth: "chart.line.uptrend.xyaxis"
         }
     }
 }
@@ -48,6 +50,8 @@ struct ContentView: View {
             InsightsView()
         case .settings:
             SettingsView()
+        case .netWorth:
+            NetWorthView()
         }
     }
 }
