@@ -369,13 +369,14 @@ public struct DashboardView: View {
         }
     }
 
-    private func frequencyLabel(_ frequency: RecurringFrequency) -> String {
+    private func frequencyLabel(_ frequency: RecurringFrequency?) -> String {
+        guard let frequency else { return "Marked recurring" }
         switch frequency {
-        case .weekly: "Weekly"
-        case .biweekly: "Every 2 weeks"
-        case .monthly: "Monthly"
-        case .quarterly: "Quarterly"
-        case .yearly: "Yearly"
+        case .weekly: return "Weekly"
+        case .biweekly: return "Every 2 weeks"
+        case .monthly: return "Monthly"
+        case .quarterly: return "Quarterly"
+        case .yearly: return "Yearly"
         }
     }
 }

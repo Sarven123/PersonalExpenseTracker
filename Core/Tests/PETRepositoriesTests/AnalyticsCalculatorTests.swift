@@ -20,6 +20,7 @@ struct AnalyticsCalculatorTests {
         merchant: String = "Merchant",
         category: ExpenseCategory? = nil,
         isExcludedFromAnalytics: Bool = false,
+        isRecurring: Bool = false,
         recurringSchedule: RecurringSchedule? = nil
     ) -> ExpenseTransaction {
         let transaction = ExpenseTransaction(
@@ -28,6 +29,7 @@ struct AnalyticsCalculatorTests {
             type: type,
             merchant: merchant,
             rawDescription: merchant,
+            isRecurring: isRecurring,
             isExcludedFromAnalytics: isExcludedFromAnalytics,
             category: category,
             recurringSchedule: recurringSchedule
@@ -164,18 +166,43 @@ struct AnalyticsCalculatorTests {
         #expect(summary.total == 10)
     }
 
-    @Test("recurringSummary only includes transactions with an active schedule")
+    @Test("recurringSummary only includes transactions with an active schedule, excluding inactive schedules and one-offs")
     func recurringSummaryFiltersActiveSchedules() {
         let active = RecurringSchedule(frequency: .monthly, isActive: true)
         let inactive = RecurringSchedule(frequency: .monthly, isActive: false)
         let transactions = [
-            Self.transaction(daysFromReference: 0, amount: -10, merchant: "Netflix", recurringSchedule: active),
-            Self.transaction(daysFromReference: 0, amount: -10, merchant: "Old Gym", recurringSchedule: inactive),
+            Self.transaction(daysFromReference: 0, amount: -10, merchant: "Netflix", isRecurring: true, recurringSchedule: active),
+            Self.transaction(daysFromReference: 0, amount: -10, merchant: "Old Gym", isRecurring: true, recurringSchedule: inactive),
             Self.transaction(daysFromReference: 0, amount: -10, merchant: "One-off"),
         ]
         let summary = AnalyticsCalculator.recurringSummary(transactions: transactions)
         #expect(summary.count == 1)
         #expect(summary.first?.merchant == "Netflix")
+        #expect(summary.first?.frequency == .monthly)
+    }
+
+    @Test("recurringSummary includes a manually-flagged transaction with no auto-detected schedule")
+    func recurringSummaryIncludesManuallyFlaggedTransactions() {
+        let transactions = [
+            Self.transaction(daysFromReference: 0, amount: -50, merchant: "Gym Membership", isRecurring: true),
+        ]
+        let summary = AnalyticsCalculator.recurringSummary(transactions: transactions)
+        #expect(summary.count == 1)
+        #expect(summary.first?.merchant == "Gym Membership")
+        #expect(summary.first?.frequency == nil)
+        #expect(summary.first?.nextExpectedDate == nil)
+    }
+
+    @Test("recurringSummary prefers an auto-detected schedule over a bare manual flag for the same merchant")
+    func recurringSummaryPrefersDetectedScheduleOverManualFlag() {
+        let schedule = RecurringSchedule(frequency: .weekly, isActive: true)
+        let transactions = [
+            Self.transaction(daysFromReference: 0, amount: -10, merchant: "Netflix", isRecurring: true),
+            Self.transaction(daysFromReference: -30, amount: -10, merchant: "Netflix", isRecurring: true, recurringSchedule: schedule),
+        ]
+        let summary = AnalyticsCalculator.recurringSummary(transactions: transactions)
+        #expect(summary.count == 1)
+        #expect(summary.first?.frequency == .weekly)
     }
 
     @Test("monthlyTotals returns one entry per trailing month, oldest first")

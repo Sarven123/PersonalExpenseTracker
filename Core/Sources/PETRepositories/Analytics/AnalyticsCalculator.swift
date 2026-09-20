@@ -40,7 +40,9 @@ public struct RecurringSummaryItem: Identifiable, Equatable, Sendable {
     public var id: String { merchant }
     public let merchant: String
     public let amount: Decimal
-    public let frequency: RecurringFrequency
+    /// `nil` when the transaction was manually flagged `isRecurring` by the
+    /// user but no cadence has been auto-detected yet (no `RecurringSchedule`).
+    public let frequency: RecurringFrequency?
     public let nextExpectedDate: Date?
 }
 
@@ -171,19 +173,38 @@ public enum AnalyticsCalculator {
         return WeeklySummary(total: total, dailyTotals: daily, leadingCategories: Array(categories.prefix(3)))
     }
 
-    /// Active recurring schedules, soonest expected first.
+    /// Every transaction that's recurring — either because a `RecurringSchedule`
+    /// was auto-detected (`RecurringScheduleRepository`) or because the user
+    /// manually flagged it via the "Recurring" toggle on the transaction editor,
+    /// which sets `isRecurring` directly with no schedule attached. A schedule,
+    /// when present, is authoritative: an active one always contributes its known
+    /// cadence (overriding any bare manual flag for the same merchant), an
+    /// inactive one always excludes the merchant regardless of `isRecurring`. The
+    /// bare `isRecurring` flag is only consulted when there's no schedule at all.
+    /// One entry per merchant, soonest expected date first.
     public static func recurringSummary(transactions: [ExpenseTransaction]) -> [RecurringSummaryItem] {
-        transactions
-            .compactMap { transaction -> RecurringSummaryItem? in
-                guard let schedule = transaction.recurringSchedule, schedule.isActive else { return nil }
-                return RecurringSummaryItem(
+        var byMerchant: [String: RecurringSummaryItem] = [:]
+
+        for transaction in transactions {
+            if let schedule = transaction.recurringSchedule {
+                guard schedule.isActive else { continue }
+                byMerchant[transaction.merchant] = RecurringSummaryItem(
                     merchant: transaction.merchant,
                     amount: transaction.amount,
                     frequency: schedule.frequency,
                     nextExpectedDate: schedule.nextExpectedDate
                 )
+            } else if transaction.isRecurring, byMerchant[transaction.merchant] == nil {
+                byMerchant[transaction.merchant] = RecurringSummaryItem(
+                    merchant: transaction.merchant,
+                    amount: transaction.amount,
+                    frequency: nil,
+                    nextExpectedDate: nil
+                )
             }
-            .sorted { ($0.nextExpectedDate ?? .distantFuture) < ($1.nextExpectedDate ?? .distantFuture) }
+        }
+
+        return byMerchant.values.sorted { ($0.nextExpectedDate ?? .distantFuture) < ($1.nextExpectedDate ?? .distantFuture) }
     }
 
     /// Total spending per calendar month for the trailing `monthsBack` months
