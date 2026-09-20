@@ -32,6 +32,7 @@ public struct AssetsView: View {
     @State private var isPresentingAddSheet = false
     @State private var editingAsset: Asset?
     @State private var groupingMode: GroupingMode = .name
+    @State private var searchText = ""
     @State private var errorMessage: String?
 
     public init() {}
@@ -40,10 +41,13 @@ public struct AssetsView: View {
         Group {
             if assets.isEmpty {
                 emptyState
+            } else if sortedAssets.isEmpty {
+                noResultsState
             } else {
                 table
             }
         }
+        .searchable(text: $searchText, prompt: "Search assets")
         .navigationTitle("Assets")
         .toolbar {
             ToolbarItemGroup {
@@ -87,21 +91,40 @@ public struct AssetsView: View {
         }
     }
 
+    private var noResultsState: some View {
+        ContentUnavailableView {
+            Label("No Matching Assets", systemImage: "magnifyingglass")
+        } description: {
+            Text("No assets match “\(searchText)”.")
+        }
+    }
+
+    private var filteredAssets: [Asset] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return assets }
+        let lowered = trimmed.lowercased()
+        return assets.filter {
+            $0.name.lowercased().contains(lowered)
+                || ($0.ticker?.lowercased().contains(lowered) ?? false)
+                || ($0.accountOrLocation?.lowercased().contains(lowered) ?? false)
+        }
+    }
+
     /// "Grouping" is implemented as a sort (like items cluster together, visible via the Type/
     /// Account column), not literal collapsible sections — `Table` doesn't support sectioning as
     /// naturally as `List`, and clustering-by-sort is a proportionate answer to a screen this size.
     private var sortedAssets: [Asset] {
         switch groupingMode {
         case .name:
-            return assets
+            return filteredAssets
         case .type:
-            return assets.sorted { lhs, rhs in
+            return filteredAssets.sorted { lhs, rhs in
                 lhs.assetType.displayName == rhs.assetType.displayName
                     ? lhs.name < rhs.name
                     : lhs.assetType.displayName < rhs.assetType.displayName
             }
         case .location:
-            return assets.sorted { lhs, rhs in
+            return filteredAssets.sorted { lhs, rhs in
                 let lhsLocation = lhs.accountOrLocation ?? ""
                 let rhsLocation = rhs.accountOrLocation ?? ""
                 return lhsLocation == rhsLocation ? lhs.name < rhs.name : lhsLocation < rhsLocation
