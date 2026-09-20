@@ -30,11 +30,6 @@ public struct ImportCSVView: View {
         NavigationStack {
             content
                 .navigationTitle("Import CSV")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(isFinished ? "Close" : "Cancel") { dismiss() }
-                    }
-                }
         }
         .frame(minWidth: 560, minHeight: 520)
         .fileImporter(
@@ -47,22 +42,58 @@ public struct ImportCSVView: View {
         }
     }
 
-    private var isFinished: Bool {
-        if case .finished = step { return true }
-        return false
-    }
-
     @ViewBuilder
     private var content: some View {
         switch step {
         case .pickFile:
             pickFileStep
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
         case let .reviewParse(fileName, result):
             reviewParseStep(fileName: fileName, result: result)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Button("Choose Different File") {
+                            errorMessage = nil
+                            step = .pickFile
+                            isPresentingFileImporter = true
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Continue") { proceedToDuplicateReview(fileName: fileName, result: result) }
+                            .disabled(result.drafts.isEmpty)
+                    }
+                }
         case let .reviewDuplicates(fileName, result, unique, duplicates):
             reviewDuplicatesStep(fileName: fileName, result: result, unique: unique, duplicates: duplicates)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Button("Back") { step = .reviewParse(fileName: fileName, result: result) }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        let acceptedCount = unique.count + includedDuplicateRows.count
+                        Button("Import \(acceptedCount) Transaction\(acceptedCount == 1 ? "" : "s")") {
+                            commit(fileName: fileName, result: result, unique: unique, duplicates: duplicates)
+                        }
+                        .disabled(acceptedCount == 0)
+                    }
+                }
         case let .finished(batch):
             finishedStep(batch: batch)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
         }
     }
 
@@ -132,21 +163,6 @@ public struct ImportCSVView: View {
                     }
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button("Choose Different File") {
-                    errorMessage = nil
-                    step = .pickFile
-                    isPresentingFileImporter = true
-                }
-                Spacer()
-                Button("Continue") { proceedToDuplicateReview(fileName: fileName, result: result) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(result.drafts.isEmpty)
-            }
-            .padding()
-            .background(.bar)
         }
     }
 
@@ -228,20 +244,6 @@ public struct ImportCSVView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            let acceptedCount = unique.count + includedDuplicateRows.count
-            HStack {
-                Button("Back") { step = .reviewParse(fileName: fileName, result: result) }
-                Spacer()
-                Button("Import \(acceptedCount) Transaction\(acceptedCount == 1 ? "" : "s")") {
-                    commit(fileName: fileName, result: result, unique: unique, duplicates: duplicates)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(acceptedCount == 0)
-            }
-            .padding()
-            .background(.bar)
-        }
     }
 
     private func includeDuplicateBinding(for draft: DraftTransaction) -> Binding<Bool> {
@@ -299,8 +301,6 @@ public struct ImportCSVView: View {
                 }
             }
             .font(.subheadline)
-            Button("Done") { dismiss() }
-                .buttonStyle(.borderedProminent)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
