@@ -32,7 +32,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("3", modifiers: .command)
             Button("Settings") { selectSidebarSection(.settings) }
                 .keyboardShortcut("4", modifiers: .command)
-            Button("Net Worth") { selectSidebarSection(.netWorth) }
+            Button("Assets") { selectSidebarSection(.assets) }
                 .keyboardShortcut("5", modifiers: .command)
         }
     }

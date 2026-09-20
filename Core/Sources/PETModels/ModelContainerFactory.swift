@@ -3,7 +3,7 @@ import SwiftData
 
 public enum ModelContainerFactory {
     public static var schema: Schema {
-        Schema(SchemaV2.models)
+        Schema(SchemaV3.models)
     }
 
     public static func makeLiveContainer() -> ModelContainer {
