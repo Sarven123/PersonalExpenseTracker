@@ -44,6 +44,13 @@ public struct RecurringSummaryItem: Identifiable, Equatable, Sendable {
     public let nextExpectedDate: Date?
 }
 
+public struct MonthlyTotal: Identifiable, Equatable, Sendable {
+    public var id: Date { month }
+    /// The first day of the month, in the calendar passed to `monthlyTotals`.
+    public let month: Date
+    public let total: Decimal
+}
+
 /// Pure aggregation functions over an already-fetched `[ExpenseTransaction]`
 /// array — no SwiftData context needed, so these are trivially unit-testable
 /// and cheap to recompute reactively whenever a SwiftUI `@Query` changes.
@@ -177,6 +184,26 @@ public enum AnalyticsCalculator {
                 )
             }
             .sorted { ($0.nextExpectedDate ?? .distantFuture) < ($1.nextExpectedDate ?? .distantFuture) }
+    }
+
+    /// Total spending per calendar month for the trailing `monthsBack` months
+    /// (inclusive of the month containing `referenceDate`), oldest first.
+    public static func monthlyTotals(
+        transactions: [ExpenseTransaction],
+        monthsBack: Int,
+        referenceDate: Date = .now,
+        calendar: Calendar = .current,
+        excludeTransfers: Bool = true
+    ) -> [MonthlyTotal] {
+        guard monthsBack > 0 else { return [] }
+        return (0..<monthsBack).reversed().compactMap { offset -> MonthlyTotal? in
+            guard let monthDate = calendar.date(byAdding: .month, value: -offset, to: referenceDate),
+                  let interval = calendar.dateInterval(of: .month, for: monthDate) else {
+                return nil
+            }
+            let monthTotal = total(of: transactions, in: interval.start..<interval.end, excludeTransfers: excludeTransfers)
+            return MonthlyTotal(month: interval.start, total: monthTotal)
+        }
     }
 
     private static func filtered(

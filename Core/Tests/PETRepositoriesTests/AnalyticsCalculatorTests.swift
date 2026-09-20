@@ -177,4 +177,25 @@ struct AnalyticsCalculatorTests {
         #expect(summary.count == 1)
         #expect(summary.first?.merchant == "Netflix")
     }
+
+    @Test("monthlyTotals returns one entry per trailing month, oldest first")
+    func monthlyTotalsReturnsOldestFirst() {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let reference = utc.date(from: DateComponents(year: 2026, month: 9, day: 15))!
+        let transactions = [
+            ExpenseTransaction(bookingDate: reference, amount: -10, type: .expense, merchant: "Merchant", rawDescription: "Merchant"),
+        ]
+        let totals = AnalyticsCalculator.monthlyTotals(transactions: transactions, monthsBack: 3, referenceDate: reference, calendar: utc)
+        #expect(totals.count == 3)
+        #expect(totals[0].month < totals[1].month)
+        #expect(totals[1].month < totals[2].month)
+        #expect(totals.last?.total == 10)
+        #expect(totals.first?.total == 0)
+    }
+
+    @Test("monthlyTotals returns an empty array for a non-positive monthsBack")
+    func monthlyTotalsHandlesZeroMonths() {
+        #expect(AnalyticsCalculator.monthlyTotals(transactions: [], monthsBack: 0).isEmpty)
+    }
 }

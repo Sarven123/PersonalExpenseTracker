@@ -39,22 +39,11 @@ struct ContentView: View {
             DashboardView()
         case .transactions:
             TransactionListView()
-        case .insights, .settings:
-            PlaceholderView(section: section)
+        case .insights:
+            InsightsView()
+        case .settings:
+            SettingsView()
         }
-    }
-}
-
-private struct PlaceholderView: View {
-    let section: SidebarSection
-
-    var body: some View {
-        ContentUnavailableView(
-            section.rawValue,
-            systemImage: section.systemImage,
-            description: Text("\(section.rawValue) will be built in an upcoming phase.")
-        )
-        .navigationTitle(section.rawValue)
     }
 }
 

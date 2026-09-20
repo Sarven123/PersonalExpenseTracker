@@ -1,42 +1,62 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 import PETModels
 import PETRepositories
+import PETExport
 
 public struct TransactionListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExpenseTransaction.bookingDate, order: .reverse) private var transactions: [ExpenseTransaction]
+    @Query(sort: \ExpenseCategory.sortOrder) private var categories: [ExpenseCategory]
 
+    @State private var filter = FilterCriteria()
+    @State private var sortOrder: [KeyPathComparator<ExpenseTransaction>] = [KeyPathComparator(\.bookingDate, order: .reverse)]
+    @State private var selection: Set<UUID> = []
     @State private var editingTransaction: ExpenseTransaction?
     @State private var isPresentingAddSheet = false
     @State private var isPresentingCategoryManager = false
     @State private var isPresentingImportSheet = false
     @State private var isPresentingMerchantRuleManager = false
-    @State private var showUncategorizedOnly = false
+    @State private var isPresentingFilterPopover = false
+    @State private var isPresentingExporter = false
+    @State private var exportDocument: CSVDocument?
+    @State private var errorMessage: String?
 
     public init() {}
 
-    private var displayedTransactions: [ExpenseTransaction] {
-        showUncategorizedOnly ? transactions.filter { $0.category == nil } : transactions
+    private var filteredTransactions: [ExpenseTransaction] {
+        transactions.filter { filter.matches($0) }.sorted(using: sortOrder)
     }
 
     public var body: some View {
         Group {
             if transactions.isEmpty {
                 emptyState
-            } else if displayedTransactions.isEmpty {
-                nothingToReviewState
+            } else if filteredTransactions.isEmpty {
+                noResultsState
             } else {
-                list
+                table
             }
         }
+        .searchable(text: $filter.merchantSearchText, prompt: "Search merchant")
         .navigationTitle("Transactions")
         .toolbar {
             ToolbarItemGroup {
-                Toggle(isOn: $showUncategorizedOnly) {
-                    Label("Uncategorized Only", systemImage: "questionmark.circle")
+                Button {
+                    isPresentingFilterPopover = true
+                } label: {
+                    Label("Filter", systemImage: filter.isActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 }
-                .toggleStyle(.button)
+                .popover(isPresented: $isPresentingFilterPopover) {
+                    FilterPopoverView(filter: $filter, categories: categories)
+                }
+                Button {
+                    exportFilteredTransactions()
+                } label: {
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
+                }
+                .disabled(filteredTransactions.isEmpty)
                 Button {
                     isPresentingMerchantRuleManager = true
                 } label: {
@@ -74,6 +94,24 @@ public struct TransactionListView: View {
         .sheet(isPresented: $isPresentingMerchantRuleManager) {
             MerchantRuleManagerView()
         }
+        .fileExporter(
+            isPresented: $isPresentingExporter,
+            document: exportDocument,
+            contentType: .commaSeparatedText,
+            defaultFilename: "Transactions"
+        ) { result in
+            if case let .failure(error) = result {
+                errorMessage = error.localizedDescription
+            }
+        }
+        .alert(
+            "Export Failed",
+            isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .petRequestAddExpense)) { _ in
             isPresentingAddSheet = true
         }
@@ -94,73 +132,86 @@ public struct TransactionListView: View {
         }
     }
 
-    private var nothingToReviewState: some View {
+    private var noResultsState: some View {
         ContentUnavailableView {
-            Label("Nothing to Review", systemImage: "checkmark.circle")
+            Label("No Matching Transactions", systemImage: "line.3.horizontal.decrease.circle")
         } description: {
-            Text("Every transaction already has a category.")
+            Text("No transactions match the current search and filters.")
         } actions: {
-            Button("Show All Transactions") { showUncategorizedOnly = false }
+            Button("Reset Filters") { filter.reset() }
         }
     }
 
-    private var list: some View {
-        List {
-            ForEach(displayedTransactions) { transaction in
-                Button {
-                    editingTransaction = transaction
-                } label: {
-                    TransactionRow(transaction: transaction)
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button("Edit…") { editingTransaction = transaction }
-                    Button("Delete", role: .destructive) { delete(transaction) }
-                }
+    private var table: some View {
+        Table(filteredTransactions, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn("Date", value: \.bookingDate) { transaction in
+                Text(transaction.bookingDate, format: .dateTime.day().month().year())
             }
-            .onDelete(perform: deleteOffsets)
-        }
-    }
+            .width(min: 90, ideal: 100)
 
-    private func delete(_ transaction: ExpenseTransaction) {
-        try? TransactionRepository(context: modelContext).delete(transaction)
-    }
-
-    private func deleteOffsets(_ offsets: IndexSet) {
-        let repository = TransactionRepository(context: modelContext)
-        for index in offsets {
-            try? repository.delete(displayedTransactions[index])
-        }
-    }
-}
-
-private struct TransactionRow: View {
-    let transaction: ExpenseTransaction
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            TableColumn("Merchant", value: \.merchant) { transaction in
                 HStack(spacing: 4) {
                     Text(transaction.merchant)
-                        .font(.body.weight(.medium))
                     if transaction.isRecurring {
                         Image(systemName: "repeat.circle.fill")
                             .foregroundStyle(.secondary)
                             .help("Recurring")
                     }
                 }
-                Text(transaction.bookingDate, format: .dateTime.day().month().year())
+            }
+            .width(min: 140, ideal: 220)
+
+            TableColumn("Category") { transaction in
+                CategoryBadge(category: transaction.category)
+            }
+            .width(min: 100, ideal: 140)
+
+            TableColumn("Amount", value: \.amount) { transaction in
+                Text(transaction.amount, format: .currency(code: transaction.currencyCode))
+                    .monospacedDigit()
+                    .foregroundStyle(transaction.amount < 0 ? Color.red : Color.green)
+            }
+            .width(min: 90, ideal: 100)
+
+            TableColumn("Source") { transaction in
+                Text(transaction.source == .manual ? "Manual" : "Imported")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            CategoryBadge(category: transaction.category)
-            Text(transaction.amount, format: .currency(code: transaction.currencyCode))
-                .monospacedDigit()
-                .foregroundStyle(transaction.amount < 0 ? Color.red : Color.green)
-                .frame(minWidth: 90, alignment: .trailing)
+            .width(min: 70, ideal: 90)
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            if ids.count == 1, let transaction = transaction(for: ids.first) {
+                Button("Edit…") { editingTransaction = transaction }
+            }
+            Button(ids.count > 1 ? "Delete \(ids.count) Transactions" : "Delete", role: .destructive) {
+                deleteSelection(ids)
+            }
+        } primaryAction: { ids in
+            if ids.count == 1, let transaction = transaction(for: ids.first) {
+                editingTransaction = transaction
+            }
+        }
+        .onDeleteCommand {
+            deleteSelection(selection)
+        }
+    }
+
+    private func transaction(for id: UUID?) -> ExpenseTransaction? {
+        guard let id else { return nil }
+        return filteredTransactions.first { $0.id == id }
+    }
+
+    private func deleteSelection(_ ids: Set<UUID>) {
+        let repository = TransactionRepository(context: modelContext)
+        for transaction in filteredTransactions where ids.contains(transaction.id) {
+            try? repository.delete(transaction)
+        }
+        selection.removeAll()
+    }
+
+    private func exportFilteredTransactions() {
+        exportDocument = CSVDocument(data: TransactionCSVExporter.exportData(filteredTransactions))
+        isPresentingExporter = true
     }
 }
