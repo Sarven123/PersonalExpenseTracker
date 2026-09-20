@@ -139,7 +139,12 @@ public struct InsightsView: View {
 
     private var subscriptionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Subscriptions").font(.headline)
+            // Titled to match DashboardView's equivalent section — this lists every
+            // *recurring* transaction (any category), not just ones in the
+            // "Subscriptions" category, which is a separate, unrelated concept
+            // shown above in "By Category". Sharing the word "Subscriptions" for
+            // both was a real point of user confusion.
+            Text("Recurring & Subscriptions").font(.headline)
             if recurringItems.isEmpty {
                 Text("No recurring transactions detected yet.")
                     .font(.subheadline)
