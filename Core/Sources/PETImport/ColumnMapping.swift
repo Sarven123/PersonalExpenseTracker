@@ -1,7 +1,7 @@
 import Foundation
 import PETModels
 
-public enum SemanticField: Hashable, Sendable {
+public enum SemanticField: String, Hashable, Sendable, Codable, CaseIterable {
     case bookingDate
     case valueDate
     /// The transaction-type label — "Buchungstext" in CAMT exports, "Umsatzart" in MT940-style exports.
@@ -22,7 +22,7 @@ public enum SemanticField: Hashable, Sendable {
 /// file uses. The two layouts reuse the header label "Buchungstext" for
 /// different semantic roles, so detection must be layout-aware rather than
 /// a single flat alias table.
-public struct ColumnMapping: Sendable, Equatable {
+public struct ColumnMapping: Sendable, Equatable, Codable {
     public let sourceFormat: ImportSourceFormat
     public let indices: [SemanticField: Int]
 

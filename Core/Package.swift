@@ -32,12 +32,12 @@ let package = Package(
         ),
         .target(
             name: "PETRepositories",
-            dependencies: ["PETModels", "PETCategorization"],
+            dependencies: ["PETModels", "PETCategorization", "PETImport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
             name: "PETSharedUI",
-            dependencies: ["PETModels", "PETRepositories"],
+            dependencies: ["PETModels", "PETRepositories", "PETImport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
@@ -52,7 +52,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PETRepositoriesTests",
-            dependencies: ["PETRepositories"],
+            dependencies: ["PETRepositories", "PETImport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

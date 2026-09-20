@@ -2,10 +2,12 @@ import Foundation
 import PETModels
 
 public struct ImportParseResult: Sendable {
-    public let sourceFormat: ImportSourceFormat
+    public let columnMapping: ColumnMapping
     public let detectedEncoding: DetectedEncoding
     public let drafts: [DraftTransaction]
     public let warnings: [ImportError]
+
+    public var sourceFormat: ImportSourceFormat { columnMapping.sourceFormat }
 }
 
 /// End-to-end parsing of a raw Sparkasse CSV export into draft transactions.
@@ -42,7 +44,7 @@ public enum CSVImportPipeline {
         }
 
         return ImportParseResult(
-            sourceFormat: mapping.sourceFormat,
+            columnMapping: mapping,
             detectedEncoding: encoding,
             drafts: drafts,
             warnings: warnings

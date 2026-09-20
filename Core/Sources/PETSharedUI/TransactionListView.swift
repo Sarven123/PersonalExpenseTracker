@@ -10,6 +10,7 @@ public struct TransactionListView: View {
     @State private var editingTransaction: ExpenseTransaction?
     @State private var isPresentingAddSheet = false
     @State private var isPresentingCategoryManager = false
+    @State private var isPresentingImportSheet = false
 
     public init() {}
 
@@ -30,6 +31,11 @@ public struct TransactionListView: View {
                     Label("Manage Categories", systemImage: "tag")
                 }
                 Button {
+                    isPresentingImportSheet = true
+                } label: {
+                    Label("Import CSV", systemImage: "square.and.arrow.down")
+                }
+                Button {
                     isPresentingAddSheet = true
                 } label: {
                     Label("Add Expense", systemImage: "plus")
@@ -45,8 +51,14 @@ public struct TransactionListView: View {
         .sheet(isPresented: $isPresentingCategoryManager) {
             CategoryManagerView()
         }
+        .sheet(isPresented: $isPresentingImportSheet) {
+            ImportCSVView()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .petRequestAddExpense)) { _ in
             isPresentingAddSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .petRequestImportCSV)) { _ in
+            isPresentingImportSheet = true
         }
     }
 
@@ -54,8 +66,9 @@ public struct TransactionListView: View {
         ContentUnavailableView {
             Label("No Transactions Yet", systemImage: "tray")
         } description: {
-            Text("Add your first expense to get started. Sparkasse CSV import arrives in a later update.")
+            Text("Add your first expense manually, or import a Sparkasse CSV export.")
         } actions: {
+            Button("Import CSV") { isPresentingImportSheet = true }
             Button("Add Expense") { isPresentingAddSheet = true }
                 .buttonStyle(.borderedProminent)
         }

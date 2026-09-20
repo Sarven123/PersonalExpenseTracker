@@ -8,6 +8,11 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: .petRequestAddExpense, object: nil)
             }
             .keyboardShortcut("n", modifiers: .command)
+
+            Button("Import CSV…") {
+                NotificationCenter.default.post(name: .petRequestImportCSV, object: nil)
+            }
+            .keyboardShortcut("i", modifiers: .command)
         }
     }
 }

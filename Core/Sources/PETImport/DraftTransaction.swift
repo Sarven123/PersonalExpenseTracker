@@ -19,4 +19,36 @@ public struct DraftTransaction: Sendable, Equatable {
     public let counterpartyIBAN: String?
     public let bic: String?
     public let dedupeHash: String
+
+    public init(
+        sourceRowNumber: Int,
+        bookingDate: Date,
+        valueDate: Date?,
+        amount: Decimal,
+        currencyCode: String,
+        type: TransactionType,
+        merchant: String,
+        rawDescription: String,
+        purpose: String?,
+        bookingText: String?,
+        ownIBAN: String?,
+        counterpartyIBAN: String?,
+        bic: String?,
+        dedupeHash: String
+    ) {
+        self.sourceRowNumber = sourceRowNumber
+        self.bookingDate = bookingDate
+        self.valueDate = valueDate
+        self.amount = amount
+        self.currencyCode = currencyCode
+        self.type = type
+        self.merchant = merchant
+        self.rawDescription = rawDescription
+        self.purpose = purpose
+        self.bookingText = bookingText
+        self.ownIBAN = ownIBAN
+        self.counterpartyIBAN = counterpartyIBAN
+        self.bic = bic
+        self.dedupeHash = dedupeHash
+    }
 }
