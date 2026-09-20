@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "PETCategorization", targets: ["PETCategorization"]),
         .library(name: "PETRepositories", targets: ["PETRepositories"]),
         .library(name: "PETSharedUI", targets: ["PETSharedUI"]),
+        .library(name: "PETImport", targets: ["PETImport"]),
     ],
     targets: [
         .target(
@@ -21,6 +22,11 @@ let package = Package(
         ),
         .target(
             name: "PETCategorization",
+            dependencies: ["PETModels"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
+            name: "PETImport",
             dependencies: ["PETModels"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
@@ -47,6 +53,11 @@ let package = Package(
         .testTarget(
             name: "PETRepositoriesTests",
             dependencies: ["PETRepositories"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "PETImportTests",
+            dependencies: ["PETImport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
