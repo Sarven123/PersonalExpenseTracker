@@ -149,6 +149,7 @@ public struct InsightsView: View {
                     HStack {
                         Image(systemName: "repeat.circle.fill")
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                         Text(item.merchant).font(.subheadline)
                         Spacer()
                         Text(item.amount, format: .currency(code: "EUR"))

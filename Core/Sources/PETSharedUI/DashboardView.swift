@@ -319,6 +319,7 @@ public struct DashboardView: View {
                     HStack {
                         Image(systemName: "repeat.circle.fill")
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.merchant)
                                 .font(.subheadline)

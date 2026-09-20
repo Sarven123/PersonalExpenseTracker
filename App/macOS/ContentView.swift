@@ -30,6 +30,11 @@ struct ContentView: View {
                 destination(for: selection ?? .dashboard)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .petRequestSidebarSection)) { notification in
+            if let section = notification.object as? SidebarSection {
+                selection = section
+            }
+        }
     }
 
     @ViewBuilder

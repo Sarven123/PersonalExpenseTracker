@@ -104,6 +104,7 @@ public struct ImportCSVView: View {
             Image(systemName: "arrow.down.doc")
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("Choose a Sparkasse CSV export to import.")
                 .font(.headline)
             Text("CAMT and MT940-style exports are supported, in UTF-8 or Windows-1252 encoding.")
@@ -291,6 +292,7 @@ public struct ImportCSVView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(.green)
+                .accessibilityHidden(true)
             Text("Import Complete")
                 .font(.headline)
             VStack(spacing: 4) {

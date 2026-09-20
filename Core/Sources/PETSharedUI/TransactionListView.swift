@@ -156,8 +156,11 @@ public struct TransactionListView: View {
                         Image(systemName: "repeat.circle.fill")
                             .foregroundStyle(.secondary)
                             .help("Recurring")
+                            .accessibilityHidden(true)
                     }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(transaction.isRecurring ? "\(transaction.merchant), recurring" : transaction.merchant)
             }
             .width(min: 140, ideal: 220)
 
