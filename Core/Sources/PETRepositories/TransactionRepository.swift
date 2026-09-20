@@ -40,6 +40,9 @@ public final class TransactionRepository {
         )
         context.insert(transaction)
         try context.save()
+        if let category {
+            try MerchantRuleRepository(context: context).recordUserCorrection(merchant: trimmedMerchant, category: category)
+        }
         return transaction
     }
 
@@ -62,6 +65,9 @@ public final class TransactionRepository {
         transaction.isRecurring = isRecurring
         transaction.modifiedAt = .now
         try context.save()
+        if let category {
+            try MerchantRuleRepository(context: context).recordUserCorrection(merchant: transaction.merchant, category: category)
+        }
     }
 
     public func delete(_ transaction: ExpenseTransaction) throws {

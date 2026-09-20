@@ -47,7 +47,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PETCategorizationTests",
-            dependencies: ["PETCategorization"],
+            dependencies: ["PETCategorization", "PETModels"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

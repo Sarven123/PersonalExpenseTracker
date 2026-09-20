@@ -25,9 +25,10 @@ struct PersonalExpenseTrackerApp: App {
     private func seedDefaultCategoriesIfNeeded() {
         do {
             try CategoryRepository(context: modelContainer.mainContext).seedDefaultCategoriesIfNeeded()
+            try MerchantRuleRepository(context: modelContainer.mainContext).seedBuiltInRulesIfNeeded()
         } catch {
             #if DEBUG
-            print("Failed to seed default categories: \(error)")
+            print("Failed to seed default categories or merchant rules: \(error)")
             #endif
         }
     }

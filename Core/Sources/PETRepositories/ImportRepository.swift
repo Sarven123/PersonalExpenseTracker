@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import PETModels
 import PETImport
+import PETCategorization
 
 @MainActor
 public final class ImportRepository {
@@ -18,6 +19,11 @@ public final class ImportRepository {
         return Set(try context.fetch(descriptor).map(\.dedupeHash))
     }
 
+    /// Commits a batch of accepted drafts, auto-suggesting a category for each
+    /// via `CategoryRuleEngine` against every stored `MerchantRule` (builtin +
+    /// user-correction). A draft with no matching rule stays Uncategorized —
+    /// see the "Uncategorized" review filter. Also refreshes recurring-transaction
+    /// detection across the whole dataset once the batch is committed.
     @discardableResult
     public func commitImport(
         sourceFileName: String,
@@ -25,8 +31,7 @@ public final class ImportRepository {
         detectedEncoding: DetectedEncoding,
         totalRowCount: Int,
         acceptedDrafts: [DraftTransaction],
-        skippedDuplicateCount: Int,
-        category: ExpenseCategory? = nil
+        skippedDuplicateCount: Int
     ) throws -> ImportBatch {
         let batch = ImportBatch(
             sourceFileName: sourceFileName,
@@ -39,7 +44,10 @@ public final class ImportRepository {
         )
         context.insert(batch)
 
+        let rules = try MerchantRuleRepository(context: context).fetchAll()
+
         for draft in acceptedDrafts {
+            let matchedRule = CategoryRuleEngine.bestMatch(merchant: draft.merchant, purpose: draft.purpose, rules: rules)
             let transaction = ExpenseTransaction(
                 bookingDate: draft.bookingDate,
                 valueDate: draft.valueDate,
@@ -55,13 +63,18 @@ public final class ImportRepository {
                 isRecurring: false,
                 source: .imported,
                 dedupeHash: draft.dedupeHash,
-                category: category,
+                categorySuggestionSource: matchedRule.map { "rule:\($0.origin.rawValue)" },
+                category: matchedRule?.category,
                 importBatch: batch
             )
             context.insert(transaction)
+            if let matchedRule {
+                matchedRule.matchCount += 1
+            }
         }
 
         try context.save()
+        try RecurringScheduleRepository(context: context).refreshDetectedRecurrence()
         return batch
     }
 }

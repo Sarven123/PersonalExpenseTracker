@@ -11,13 +11,21 @@ public struct TransactionListView: View {
     @State private var isPresentingAddSheet = false
     @State private var isPresentingCategoryManager = false
     @State private var isPresentingImportSheet = false
+    @State private var isPresentingMerchantRuleManager = false
+    @State private var showUncategorizedOnly = false
 
     public init() {}
+
+    private var displayedTransactions: [ExpenseTransaction] {
+        showUncategorizedOnly ? transactions.filter { $0.category == nil } : transactions
+    }
 
     public var body: some View {
         Group {
             if transactions.isEmpty {
                 emptyState
+            } else if displayedTransactions.isEmpty {
+                nothingToReviewState
             } else {
                 list
             }
@@ -25,6 +33,15 @@ public struct TransactionListView: View {
         .navigationTitle("Transactions")
         .toolbar {
             ToolbarItemGroup {
+                Toggle(isOn: $showUncategorizedOnly) {
+                    Label("Uncategorized Only", systemImage: "questionmark.circle")
+                }
+                .toggleStyle(.button)
+                Button {
+                    isPresentingMerchantRuleManager = true
+                } label: {
+                    Label("Merchant Rules", systemImage: "wand.and.stars")
+                }
                 Button {
                     isPresentingCategoryManager = true
                 } label: {
@@ -54,6 +71,9 @@ public struct TransactionListView: View {
         .sheet(isPresented: $isPresentingImportSheet) {
             ImportCSVView()
         }
+        .sheet(isPresented: $isPresentingMerchantRuleManager) {
+            MerchantRuleManagerView()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .petRequestAddExpense)) { _ in
             isPresentingAddSheet = true
         }
@@ -74,9 +94,19 @@ public struct TransactionListView: View {
         }
     }
 
+    private var nothingToReviewState: some View {
+        ContentUnavailableView {
+            Label("Nothing to Review", systemImage: "checkmark.circle")
+        } description: {
+            Text("Every transaction already has a category.")
+        } actions: {
+            Button("Show All Transactions") { showUncategorizedOnly = false }
+        }
+    }
+
     private var list: some View {
         List {
-            ForEach(transactions) { transaction in
+            ForEach(displayedTransactions) { transaction in
                 Button {
                     editingTransaction = transaction
                 } label: {
@@ -99,7 +129,7 @@ public struct TransactionListView: View {
     private func deleteOffsets(_ offsets: IndexSet) {
         let repository = TransactionRepository(context: modelContext)
         for index in offsets {
-            try? repository.delete(transactions[index])
+            try? repository.delete(displayedTransactions[index])
         }
     }
 }
@@ -110,8 +140,15 @@ private struct TransactionRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.merchant)
-                    .font(.body.weight(.medium))
+                HStack(spacing: 4) {
+                    Text(transaction.merchant)
+                        .font(.body.weight(.medium))
+                    if transaction.isRecurring {
+                        Image(systemName: "repeat.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .help("Recurring")
+                    }
+                }
                 Text(transaction.bookingDate, format: .dateTime.day().month().year())
                     .font(.caption)
                     .foregroundStyle(.secondary)

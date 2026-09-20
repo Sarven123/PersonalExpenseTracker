@@ -79,4 +79,60 @@ struct TransactionRepositoryTests {
         try repository.delete(transaction)
         #expect(try repository.fetchAll().isEmpty)
     }
+
+    @Test("Creating a manual transaction with a category records a merchant rule")
+    @MainActor
+    func creatingWithCategoryRecordsRule() throws {
+        let container = makeContainer()
+        let categoryRepository = CategoryRepository(context: container.mainContext)
+        try categoryRepository.seedDefaultCategoriesIfNeeded()
+        let travel = try categoryRepository.fetchAll().first { $0.name == "Travel" }!
+
+        let repository = TransactionRepository(context: container.mainContext)
+        try repository.createManualTransaction(
+            date: .now, magnitude: 5, type: .expense, merchant: "Corner Coffee Shop",
+            notes: nil, category: travel, isRecurring: false
+        )
+
+        let rules = try MerchantRuleRepository(context: container.mainContext).fetchAll()
+        #expect(rules.count == 1)
+        #expect(rules.first?.category?.name == "Travel")
+    }
+
+    @Test("Editing a transaction's category records/updates a merchant rule")
+    @MainActor
+    func editingCategoryRecordsRule() throws {
+        let container = makeContainer()
+        let categoryRepository = CategoryRepository(context: container.mainContext)
+        try categoryRepository.seedDefaultCategoriesIfNeeded()
+        let categories = try categoryRepository.fetchAll()
+        let food = categories.first { $0.name == "Food" }!
+        let shopping = categories.first { $0.name == "Shopping" }!
+
+        let repository = TransactionRepository(context: container.mainContext)
+        let transaction = try repository.createManualTransaction(
+            date: .now, magnitude: 5, type: .expense, merchant: "Corner Coffee Shop",
+            notes: nil, category: food, isRecurring: false
+        )
+        try repository.update(
+            transaction, date: .now, magnitude: 5, type: .expense, merchant: "Corner Coffee Shop",
+            notes: nil, category: shopping, isRecurring: false
+        )
+
+        let rules = try MerchantRuleRepository(context: container.mainContext).fetchAll()
+        #expect(rules.count == 1)
+        #expect(rules.first?.category?.name == "Shopping")
+    }
+
+    @Test("Creating a manual transaction without a category records no rule")
+    @MainActor
+    func creatingWithoutCategoryRecordsNoRule() throws {
+        let container = makeContainer()
+        let repository = TransactionRepository(context: container.mainContext)
+        try repository.createManualTransaction(
+            date: .now, magnitude: 5, type: .expense, merchant: "Test",
+            notes: nil, category: nil, isRecurring: false
+        )
+        #expect(try MerchantRuleRepository(context: container.mainContext).fetchAll().isEmpty)
+    }
 }
