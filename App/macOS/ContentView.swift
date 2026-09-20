@@ -20,16 +20,14 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct ContentView: View {
-    // Defaults to Transactions until the Dashboard is built in Phase 6 — that's
-    // the only section with real functionality right now.
-    @State private var selection: SidebarSection? = .transactions
+    @State private var selection: SidebarSection? = .dashboard
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } detail: {
             NavigationStack {
-                destination(for: selection ?? .transactions)
+                destination(for: selection ?? .dashboard)
             }
         }
     }
@@ -37,9 +35,11 @@ struct ContentView: View {
     @ViewBuilder
     private func destination(for section: SidebarSection) -> some View {
         switch section {
+        case .dashboard:
+            DashboardView()
         case .transactions:
             TransactionListView()
-        case .dashboard, .insights, .settings:
+        case .insights, .settings:
             PlaceholderView(section: section)
         }
     }
